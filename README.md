@@ -1,4 +1,4 @@
-# Deep Learning
+# Fast MRI
 https://github.com/ezerilli/fast_MRI
 
 ### SETTING UP THE ENVIRONMENT 👨🏻‍💻👨🏻‍💻👨🏻‍💻
@@ -77,6 +77,38 @@ are implemented in the fastMRI repository at https://github.com/facebookresearch
 state-of-the-art unrolled models typically requires 3 days of training on an Nvidia GPU with 16 GB of memory.
 
 
+### PROPOSAL
+
+
+#### Team: 
+
+Learner 
+
+#### Facebook Project: 
+
+Yes 
+
+#### Project Title: 
+
+fastMRI 
+
+#### Project Summary: 
+
+Magnetic resonance imaging (MRI) scans are one of the most powerful imaging modalities for medical image diagnosis due to their adaptability 
+and unparalleled soft tissue contrast. The cost of MRI being high is due to extended acquisition times required by the procedure, which can 
+reach up to 1 hours. As such, shortening MRI examinations ( fastMRI ) - while maintaining its high image quality and soft tissue contrast - 
+is a topic of significant interest to the medical community. Decreasing MRI scan time would reduce the cost and also increase the scope of 
+applying MRI use in areas where imaging modalities are used due to cost and time limitations of MRI. Deep neural networks (DNNs) are a 
+potential technique by which fastMRI can be achieved without compromising on the quality of the Image. DNNs are supervised Machine Learning 
+techniques with a more sustainable approach for training MRI models would be to use self-supervision on already-subsampled data. 
+
+#### Approach: 
+
+1. Replicate the SSL approach presented in https://arxiv.org/abs/1912.07669  
+2. Using the paper https://arxiv.org/abs/1811.08839 and fastMRI dataset reimplement the fastMRI implementation at https://github.com/facebookresearch/fastMRI using Baseline U-Net models to scaleup for all datasets including knee and brain imaging.  
+3. Analyze and replicate data reconstruction methods in https://arxiv.org/abs/1902.03051 
+
+
 ### REFERENCES
 
 - [1] Sodickson, Daniel K., and Warren J. Manning. "Simultaneous acquisition of spatial harmonics (SMASH): fast imaging with radiofrequency coil arrays." Magnetic resonance in medicine 38.4 (1997): 591-603.
@@ -85,3 +117,17 @@ state-of-the-art unrolled models typically requires 3 days of training on an Nvi
 - [4] Hammernik, Kerstin, et al. "Learning a variational network for reconstruction of accelerated MRI data." Magnetic resonance in medicine 79.6 (2018): 3055-3071.
 - [5] Schlemper, Jo, et al. "A deep cascade of convolutional neural networks for dynamic MR image reconstruction." IEEE transactions on Medical Imaging 37.2 (2017): 491-503.
 - [6] Yaman, Burhaneddin, et al. "Self‐supervised learning of physics‐guided reconstruction neural networks without fully sampled reference data." Magnetic resonance in medicine (2020).
+- [7] Zhang, Z., et al. “Reducing Uncertainty in Undersampled MRI Reconstruction with Active Acquisition.” arXiv:1902.03051v1 (February 8, 2019)  
+
+### DATASETS
+
+- [8] https://fastmri.med.nyu.edu/ 
+- [9] https://sites.google.com/view/calgary-campinas-dataset/home  
+- [10] http://mridata.org/
+
+### TEAM MEMBERS
+
+- Sudipto Lodh 
+- Robert Bartel 
+- Enrico Zerilli 
+ 

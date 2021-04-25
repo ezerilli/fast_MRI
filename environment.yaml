@@ -12,4 +12,8 @@ dependencies:
   - torchvision==0.9.0
   - ipykernel
   - jupyter
+  - pip==21.0.1
+  - pip:
+      - git+git://github.com/ezerilli/fastMRI
+  
 
