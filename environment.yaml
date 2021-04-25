@@ -1,0 +1,15 @@
+name: fast-mri
+channels:
+  - defaults
+  - pytorch
+dependencies:
+  - numpy
+  - matplotlib
+  - pyyaml
+  - scipy
+  - tqdm
+  - pytorch==1.8.0
+  - torchvision==0.9.0
+  - ipykernel
+  - jupyter
+
