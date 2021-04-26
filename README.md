@@ -104,9 +104,9 @@ techniques with a more sustainable approach for training MRI models would be to 
 
 #### Approach: 
 
-1. Replicate the SSL approach presented in https://arxiv.org/abs/1912.07669  
-2. Using the paper https://arxiv.org/abs/1811.08839 and fastMRI dataset reimplement the fastMRI implementation at https://github.com/facebookresearch/fastMRI using Baseline U-Net models to scaleup for all datasets including knee and brain imaging.  
-3. Analyze and replicate data reconstruction methods in https://arxiv.org/abs/1902.03051 
+1. Replicate the SSL approach presented in [6].  
+2. Using the paper [8] and fastMRI dataset [9] reimplement the fastMRI implementation at [10] using Baseline U-Net models to scaleup for all datasets including knee and brain imaging.  
+3. Analyze and replicate data reconstruction methods in [7].
 
 
 ### REFERENCES
@@ -116,14 +116,16 @@ techniques with a more sustainable approach for training MRI models would be to 
 - [3] Griswold, Mark A., et al. "Generalized autocalibrating partially parallel acquisitions (GRAPPA)." Magnetic Resonance in Medicine: An Official Journal of the International Society for Magnetic Resonance in Medicine 47.6 (2002): 1202-1210.
 - [4] Hammernik, Kerstin, et al. "Learning a variational network for reconstruction of accelerated MRI data." Magnetic resonance in medicine 79.6 (2018): 3055-3071.
 - [5] Schlemper, Jo, et al. "A deep cascade of convolutional neural networks for dynamic MR image reconstruction." IEEE transactions on Medical Imaging 37.2 (2017): 491-503.
-- [6] Yaman, Burhaneddin, et al. "Self‐supervised learning of physics‐guided reconstruction neural networks without fully sampled reference data." Magnetic resonance in medicine (2020).
-- [7] Zhang, Z., et al. “Reducing Uncertainty in Undersampled MRI Reconstruction with Active Acquisition.” arXiv:1902.03051v1 (February 8, 2019)  
+- [6] Yaman, Burhaneddin, et al. "Self‐supervised learning of physics‐guided reconstruction neural networks without fully sampled reference data." Magnetic resonance in medicine (2020) (https://arxiv.org/abs/1912.07669).
+- [7] Zhang, Z., et al. “Reducing Uncertainty in Undersampled MRI Reconstruction with Active Acquisition.” (February 8, 2019 (https://arxiv.org/abs/1902.03051))  
 
 ### DATASETS
 
-- [8] https://fastmri.med.nyu.edu/ 
-- [9] https://sites.google.com/view/calgary-campinas-dataset/home  
-- [10] http://mridata.org/
+The data should be contained in the folder /data.
+
+- [8] Knoll, F., et al. "fastMRI}: An Open Dataset and Benchmarks for Accelerated {MRI}" (2018) (https://arxiv.org/abs/1811.08839).
+- [9] NYU Fast MRI Dataset: https://fastmri.med.nyu.edu/ 
+- [10] FAIR, Fast MRI repository (https://github.com/facebookresearch/fastMRI). 
 
 ### TEAM MEMBERS
 
