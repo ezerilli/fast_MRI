@@ -123,7 +123,7 @@ techniques with a more sustainable approach for training MRI models would be to 
 
 The data should be contained in the folder /data.
 
-- [8] Knoll, F., et al. "fastMRI}: An Open Dataset and Benchmarks for Accelerated {MRI}" (2018) (https://arxiv.org/abs/1811.08839).
+- [8] Knoll, F., et al. "fastMRI: An Open Dataset and Benchmarks for Accelerated MRI" (2018) (https://arxiv.org/abs/1811.08839).
 - [9] NYU Fast MRI Dataset: https://fastmri.med.nyu.edu/ 
 - [10] FAIR, Fast MRI repository (https://github.com/facebookresearch/fastMRI). 
 
