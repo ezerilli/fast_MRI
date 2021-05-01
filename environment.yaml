@@ -8,12 +8,14 @@ dependencies:
   - pyyaml
   - scipy
   - tqdm
-  - pytorch==1.8.0
-  - torchvision==0.9.0
+  - pytorch==1.8.1
+  - torchvision==0.9.1
   - ipykernel
   - jupyter
   - pip==21.0.1
   - pip:
       - git+git://github.com/ezerilli/fastMRI
   
-
+# For installing CUDA, refer to the official Pytorch website
+# Normally, one should add cudatoolkit==11.1 (or another version) from
+# the conda-forge channel. Not available on MAC binaries.s
