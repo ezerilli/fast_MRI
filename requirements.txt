@@ -1,0 +1,15 @@
+# install using pip install -r requirements.txt
+numpy==1.20.1
+torchvision==0.9.1  # for CPU only
+torch==1.8.1  # for CPU only
+matplotlib==3.3.4
+pyyaml==5.3.1
+scipy==1.6.2
+tqdm==4.59.0
+ipykernel==5.3.4
+jupyter==1.0.0
+-e fastmri
+
+# For installing torch and torchvision with CUDA 10.2 or 11.1 refer to the Pytorch official website
+# Example for CUDA 11.1 in Windows
+# pip3 install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio==0.8.1 -f https://download.pytorch.org/whl/torch_stable.html

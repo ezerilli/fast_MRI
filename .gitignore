@@ -1,2 +1,7 @@
 .idea
-env/
+*.eggs
+env
+__pycache__
+*egg-info*
+data
+output
