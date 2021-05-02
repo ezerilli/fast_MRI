@@ -38,7 +38,7 @@ class ResidualBlock(nn.Module):
 class MriSelfSupervised(nn.Module):
 
     def __int__(self, input_channels=320, output_channels=64):
-        super().__int__()
+        super(MriSelfSupervised, self).__int__()
         # layer of input and output convolution layers
         # 15 residual blocks (RB) with skip connections
             # Each RB comprised of two convolutional layers
