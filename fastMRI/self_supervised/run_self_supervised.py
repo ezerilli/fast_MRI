@@ -2,14 +2,14 @@ import datetime
 from pathlib import Path
 from argparse import ArgumentParser
 from typing import List
-from self_supervised import MriSelfSupervised
+from mri_self_supervised import MriSelfSupervised
 from ssl_transform import SslTransform
 import pytorch_lightning as pl
 
 from fastmri.pl_modules import FastMriDataModule
 
 import fastmri
-from fastmri.data import subsample
+from fastmri.data import SliceDataset, subsample
 import numpy as np
 import torch.optim
 from torch.utils.data import DataLoader
@@ -86,7 +86,7 @@ def handle_args():
     parser.add_argument("--non_deterministic", action='store_false', default=True, dest='deterministic')
     parser.add_argument("--replace_sampler_ddp", action='store_true', default=False, dest='replace_sampler_ddp',
                         help="Replace sampler ddp")
-    parser.add_argument("--seed", default=42, dest='seed', help="Seed for all the random generators")
+    parser.add_argument("--seed", default=42, dest='seed', help='Seed for all the random generators')
     parser.add_argument("--num_gpus", default=1, help="The number of available GPUs (when device is 'cuda'")
 
     return parser.parse_args()
@@ -153,6 +153,7 @@ def run_training(model: torch.nn.Module, checkpoint_dir: Path, dataloader: DataL
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     for e in range(epochs):
         for volume in dataloader:
+            # TODO: can't do this with a Dataloader directly, will have to open volumes manually
             loss = run_training_for_volume(volume, model, optimizer)
         save_checkpoint(model, checkpoint_dir)
         print(f"loss: {loss:>7f}  [{e:>5d}/{epochs:>5d}]")
@@ -171,33 +172,39 @@ def main():
     # creates k-space mask for transforming
     mask = subsample.create_mask_for_mask_type(args.mask_type, args.center_fractions, args.accelerations)
     train_transform = SslTransform(mask_func=mask, use_seed=False)
-    val_transform = SslTransform(mask_func=mask)
-    test_transform = SslTransform()
+    # val_transform = SslTransform(mask_func=mask)
+    # test_transform = SslTransform()
 
-    data_module = FastMriDataModule(
-        data_path=args.data_path,
-        challenge='singlecoil',
-        train_transform=train_transform,
-        val_transform=val_transform,
-        test_transform=test_transform,
-        test_split='test',
-        # TODO: this in particular might need to be changed
-        test_path=None,
-        sample_rate=None,
-        batch_size=1,
-        num_workers=4,
-        distributed_sampler=(args.accelerator in ("ddp", "ddp_cpu")),
-    )
+    # data_module = FastMriDataModule(
+    #     data_path=args.data_path,
+    #     challenge='singlecoil',
+    #     train_transform=train_transform,
+    #     val_transform=val_transform,
+    #     test_transform=test_transform,
+    #     test_split='test',
+    #     # TODO: this in particular might need to be changed
+    #     test_path=None,
+    #     sample_rate=None,
+    #     batch_size=1,
+    #     num_workers=4,
+    #     distributed_sampler=(args.accelerator in ("ddp", "ddp_cpu")),
+    # )
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    dataset = SliceDataset(
+        root=args.data_path,
+        transform=train_transform,
+        challenge="singlecoil",
+    )
+    dataloader = torch.utils.data.DataLoader(dataset, num_workers=4)
 
     checkpoint_path = args.checkpoint_path
     if args.mode == "train":
         if checkpoint_path.exists() and not checkpoint_path.is_dir():
             raise RuntimeError("Existing, non-directory path {} given for checkpoint directory".format(checkpoint_path))
-        model = MriSelfSupervised()
-        model.to(device)
-        run_training(model=model, checkpoint_dir=checkpoint_path, dataloader=data_module.train_dataloader())
+        model = MriSelfSupervised().to(device)
+        run_training(model=model, checkpoint_dir=checkpoint_path, dataloader=dataloader)
     elif args.mode == "test":
         if not checkpoint_path.exists():
             raise RuntimeError("Non-existing checkpoint file/directory path {}".format(checkpoint_path))
