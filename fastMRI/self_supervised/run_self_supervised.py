@@ -150,8 +150,7 @@ def run_training_for_volume(volume, model: torch.nn.Module, optimizer):
 
 
 def run_training(model: torch.nn.Module, checkpoint_dir: Path, dataloader: DataLoader, epochs=100):
-    params = list(model.conv1.parameters())
-    optimizer = torch.optim.Adam(params, lr=1e-3)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     for e in range(epochs):
         for volume in dataloader:
             loss = run_training_for_volume(volume, model, optimizer)
