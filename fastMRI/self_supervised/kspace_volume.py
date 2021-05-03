@@ -12,8 +12,8 @@ import pickle
 
 class KspaceVolume:
 
-    def __init__(self, file: Union[str, Path], pytorch_device: Optional[str] = None, example_number=None, metadata=None,
-                 recons_key=None):
+    def __init__(self, file: Union[str, Path], pytorch_device: Optional[str] = None, subsample_mask=None,
+                 example_number=None, metadata=None, recons_key=None):
         self._data_file = file
         if pytorch_device:
             self._pytorch_device = pytorch_device
@@ -25,6 +25,9 @@ class KspaceVolume:
         self.example_number = example_number
         self.metadata = metadata
         self._recons_key = recons_key
+
+        if subsample_mask is not None:
+            self.subsample_mask = subsample_mask
 
         self._shape = None
         self._size = None
@@ -44,7 +47,8 @@ class KspaceVolume:
             self._kspace_array = hf['kspace'][()]
             self._targets = hf[self._recons_key] if self._recons_key and self._recons_key in hf else None
             self._attrs = dict(hf.attrs)
-            self._attrs.update(self.metadata)
+            if self.metadata:
+                self._attrs.update(self.metadata)
 
     @property
     def attrs(self):
@@ -134,6 +138,20 @@ class KspaceVolume:
         return self._shape
 
     @property
+    def subsample_mask(self):
+        if self._subsample_mask is None:
+            shape = list()
+            for i in range(len(self.kspace_raw_tensor.shape)):
+                shape.append(1)
+            shape[-2] = self.kspace_raw_tensor.shape[-2]
+            self._subsample_mask = torch.ones(shape)
+        return self._subsample_mask
+
+    @subsample_mask.setter
+    def subsample_mask(self, subsample_mask):
+        self._subsample_mask = subsample_mask
+
+    @property
     def targets(self):
         if self._targets is None:
             self._read_h5()
@@ -142,38 +160,41 @@ class KspaceVolume:
 
 class HeldOutSslKspaceVolume(KspaceVolume):
     def __init__(self, file: Union[str, Path], theta_lambda_ratio: float = 0.5, pytorch_device: Optional[str] = None,
-                 example_number=None, metadata=None):
-        super(HeldOutSslKspaceVolume, self).__init__(file, pytorch_device, example_number, metadata)
+                 subsample_mask=None, example_number=None, metadata=None, recons_key=None):
+        super(HeldOutSslKspaceVolume, self).__init__(file=file, pytorch_device=pytorch_device,
+                                                     subsample_mask=subsample_mask, example_number=example_number,
+                                                     metadata=metadata, recons_key=recons_key)
         if theta_lambda_ratio >= 1.0 or theta_lambda_ratio <= 0:
             raise ValueError('Invalid ratio value for hold out volume slice subset')
 
         self.theta_lambda_ratio = theta_lambda_ratio
-        self._theta_indices = None
-        self._lambda_indices = None
+        self._theta_mask = None
+        self._lambda_mask = None
 
     @property
-    def lambda_indices(self):
-        if self._lambda_indices is None:
-            arange = np.arange(self.num_slices)
-            self._lambda_indices = arange[np.isin(arange, self._theta_indices, invert=True)]
-        return self._lambda_indices
+    def lambda_mask(self) -> torch.Tensor:
+        if self._lambda_mask is None:
+            self._lambda_mask = np.abs(self.theta_mask - torch.ones_like(self.theta_mask, dtype=int))
+            self._lambda_mask *= self.subsample_mask.long()
+        return self._lambda_mask
 
     @property
     def lambda_subset(self) -> torch.Tensor:
-        return self.kspace_raw_tensor[self._lambda_indices]
+        return self.kspace_raw_tensor * self.lambda_mask
 
     @property
-    def theta_indices(self):
-        if self._theta_indices is None:
+    def theta_mask(self) -> torch.Tensor:
+        if self._theta_mask is None:
             # TODO: come back and implement overlap
-            arange = np.arange(self.num_slices)
-            self._theta_indices = np.random.choice(arange, size=int(self.num_slices * self.theta_lambda_ratio),
-                                                   replace=False)
-        return self._theta_indices
+            size = int(torch.sum(self.subsample_mask) * self.theta_lambda_ratio)
+            choices = np.random.choice(torch.where(self.subsample_mask == 1)[-1], size=size, replace=False)
+            self._theta_mask = torch.zeros_like(self.subsample_mask, dtype=int)
+            self._theta_mask[choices] = 1
+        return self._theta_mask
 
     @property
     def theta_subset(self) -> torch.Tensor:
-        return self.kspace_raw_tensor[self.theta_indices]
+        return self.kspace_raw_tensor * self.theta_mask
 
 
 class KspaceVolumeDataset(fastmri.data.SliceDataset):
@@ -265,8 +286,8 @@ class KspaceVolumeDataset(fastmri.data.SliceDataset):
         fname, ex_num, metadata = self.examples[i]
         volume = HeldOutSslKspaceVolume(file=fname, example_number=ex_num, metadata=metadata)
         if self.transform is None:
-            theta_images = volume.real_images[volume.theta_indices]
-            lambda_images = volume.real_images[volume.lambda_indices]
+            theta_images = volume.real_images[volume.theta_mask]
+            lambda_images = volume.real_images[volume.lambda_mask]
             max_value = volume.attrs["max"] if "max" in volume.attrs.keys() else 0.0
             sample = (volume.kspace_raw_tensor, theta_images, lambda_images, None, None, volume.attrs, fname.name, max_value)
         else:

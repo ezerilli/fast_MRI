@@ -130,10 +130,13 @@ def run_training(model: torch.nn.Module, checkpoint_dir: Path, dataloader: DataL
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     for e in range(epochs):
         for sample in dataloader:
-            vol_raw_kspace, theta_images, lambda_images, theta_mean, theta_std, vol_attrs, vol_file, max_value = sample
+            vol_raw_kspace, subsampled_kspace, subsample_mask, subsampled_images, subsample_norm_mean, \
+                subsample_norm_std, theta_mask, lambda_mask, attrs, file_name, max_value = sample
             #loss = run_training_for_volume(volume, model, optimizer)
-            prediction = model(theta_images)
-            loss = calc_ssl_loss(u=lambda_images, v=prediction)
+            theta_mask = torch.squeeze(theta_mask, dim=0)
+            lambda_mask = torch.squeeze(lambda_mask, dim=0)
+            prediction = model(subsampled_images * theta_mask)
+            loss = calc_ssl_loss(u=(subsampled_images * lambda_mask), v=prediction)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
