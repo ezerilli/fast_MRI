@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from fastmri.pl_modules import MriModule
 
 
 class ResidualBlock(nn.Module):
@@ -35,7 +36,7 @@ class ResidualBlock(nn.Module):
         return out
 
 
-class MriSelfSupervised(nn.Module):
+class MriSelfSupervised(MriModule):
 
     def __init__(self, input_channels=1, output_channels=64):
         super(MriSelfSupervised, self).__init__()
