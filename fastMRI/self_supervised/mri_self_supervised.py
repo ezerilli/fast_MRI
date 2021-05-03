@@ -48,7 +48,8 @@ class MriSelfSupervised(nn.Module):
         self.conv1 = nn.Conv2d(input_channels, output_channels, kernel_size=(3, 3), padding=1)
         self.residual_blocks = nn.ModuleList()
         for i in range(15):
-            self.residual_blocks.append(ResidualBlock())
+            self.residual_blocks.append(ResidualBlock(output_channels, output_channels))
+        self.last = nn.Conv2d(output_channels, 1, kernel_size=(3, 3), padding=1)
 
     def forward(self, x):
         """
@@ -65,5 +66,6 @@ class MriSelfSupervised(nn.Module):
         out = self.conv1(torch.squeeze(x, dim=0))
         for rb in self.residual_blocks:
             out = rb(out)
+        out = self.last(out)
         return out
 
