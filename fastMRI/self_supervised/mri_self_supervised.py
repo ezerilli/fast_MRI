@@ -63,7 +63,8 @@ class MriSelfSupervised(nn.Module):
         -------
 
         """
-        out = self.conv1(torch.squeeze(x, dim=0))
+        #out = self.conv1(torch.squeeze(x, dim=0))
+        out = self.conv1(x)
         for rb in self.residual_blocks:
             out = rb(out)
         out = self.last(out)
