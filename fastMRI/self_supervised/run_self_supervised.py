@@ -4,13 +4,10 @@ from argparse import ArgumentParser
 from typing import List
 from mri_self_supervised import MriSelfSupervised
 from ssl_transform import SslTransform
+from kspace_volume import KspaceVolumeDataset
 import pytorch_lightning as pl
 
-from fastmri.pl_modules import FastMriDataModule
-
-import fastmri
-from fastmri.data import SliceDataset, subsample
-import numpy as np
+from fastmri.data import subsample
 import torch.optim
 from torch.utils.data import DataLoader
 
@@ -129,32 +126,17 @@ def calc_ssl_loss(u, v):
     return term_1 + term_2
 
 
-def choose_loss_split(volume, ratio=0.5):
-    # TODO: come back and implement overlap
-    arange = np.arange(volume.shape[0])
-    theta_indices = np.random.Generator.choice(arange, size=int(volume.shape[0] * ratio), replace=False)
-    lambda_indices = arange[np.isin(arange, theta_indices, invert=True)]
-    volume_theta_view = volume[theta_indices]
-    volume_lambda_view = volume[lambda_indices]
-    return volume_theta_view, volume_lambda_view
-
-
-def run_training_for_volume(volume, model: torch.nn.Module, optimizer):
-    volume_theta_view, volume_lambda_view = choose_loss_split(volume)
-    prediction = model(volume_theta_view)
-    loss = calc_ssl_loss(u=volume_lambda_view, v=prediction)
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
-    return loss
-
-
 def run_training(model: torch.nn.Module, checkpoint_dir: Path, dataloader: DataLoader, epochs=100):
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     for e in range(epochs):
-        for volume in dataloader:
-            # TODO: can't do this with a Dataloader directly, will have to open volumes manually
-            loss = run_training_for_volume(volume, model, optimizer)
+        for sample in dataloader:
+            vol_raw_kspace, theta_images, lambda_images, theta_mean, theta_std, vol_attrs, vol_file, max_value = sample
+            #loss = run_training_for_volume(volume, model, optimizer)
+            prediction = model(theta_images)
+            loss = calc_ssl_loss(u=lambda_images, v=prediction)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
         save_checkpoint(model, checkpoint_dir)
         print(f"loss: {loss:>7f}  [{e:>5d}/{epochs:>5d}]")
 
@@ -169,30 +151,13 @@ def main():
     args = handle_args()
     pl.seed_everything(args.seed)
 
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
     # creates k-space mask for transforming
     mask = subsample.create_mask_for_mask_type(args.mask_type, args.center_fractions, args.accelerations)
     train_transform = SslTransform(mask_func=mask, use_seed=False)
-    # val_transform = SslTransform(mask_func=mask)
-    # test_transform = SslTransform()
 
-    # data_module = FastMriDataModule(
-    #     data_path=args.data_path,
-    #     challenge='singlecoil',
-    #     train_transform=train_transform,
-    #     val_transform=val_transform,
-    #     test_transform=test_transform,
-    #     test_split='test',
-    #     # TODO: this in particular might need to be changed
-    #     test_path=None,
-    #     sample_rate=None,
-    #     batch_size=1,
-    #     num_workers=4,
-    #     distributed_sampler=(args.accelerator in ("ddp", "ddp_cpu")),
-    # )
-
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-    dataset = SliceDataset(
+    dataset = KspaceVolumeDataset(
         root=args.data_path,
         transform=train_transform,
         challenge="singlecoil",
