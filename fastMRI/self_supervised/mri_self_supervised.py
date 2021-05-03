@@ -45,7 +45,7 @@ class MriSelfSupervised(nn.Module):
                 # first layer is followed by a rectified linear unit (ReLU)
                 # second layer is followed by a constant multiplication layer, with factor C = 0.1 (55).
                 # All layers had a kernel size of 3×3 and 64 channels
-        self.conv1 = nn.Conv2d(input_channels, output_channels, kernel_size=(3, 3))
+        self.conv1 = nn.Conv2d(input_channels, output_channels, kernel_size=(3, 3), padding=1)
         self.residual_blocks = nn.ModuleList()
         for i in range(15):
             self.residual_blocks.append(ResidualBlock())
