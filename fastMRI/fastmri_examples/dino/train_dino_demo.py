@@ -173,7 +173,7 @@ def build_args():
         num_pool_layers=4,  # number of U-Net pooling layers
         drop_prob=0.0,  # dropout probability
         lr=0.001,  # RMSProp learning rate
-        lr_step_size=40,  # epoch at which to decrease learning rate
+        lr_step_size=8,  # epoch at which to decrease learning rate
         lr_gamma=0.1,  # extent to which to decrease learning rate
         weight_decay=0.0,  # weight decay regularization strength
     )
