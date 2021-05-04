@@ -17,6 +17,13 @@ from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 
 from fastmri.data import transforms
 
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+
+import fastmri
+from fastmri.data import transforms as T
+
+
 
 def mse(gt: np.ndarray, pred: np.ndarray) -> np.ndarray:
     """Compute Mean Squared Error (MSE)"""
@@ -112,13 +119,33 @@ def evaluate(args, recons_key):
                 continue
 
             target = target[recons_key][()]
-            recons = recons["reconstruction"][()]
+
+            from matplotlib import pyplot as plt
+
+            ###########
+            target = T.to_tensor(target)  # Convert from numpy array to pytorch tensor
+            target = fastmri.ifft2c(target)  # Apply Inverse Fourier Transform to get the complex image
+            target = fastmri.complex_abs(target)
+            target = target.numpy()
+            #plt.imshow(target[20], cmap='gray')
+            #plt.savefig("groundRealityChallenge.png", dpi=100)
+            #plt.show()
+
+            ############
+
+            recons = recons["reconstruction"][()][:,0,:,:]
+
+            #plt.imshow(recons[20], cmap='gray')
+            #plt.savefig("Reconstructed.png",dpi=100)
+            #plt.show()
+
             target = transforms.center_crop(
-                target, (target.shape[-1], target.shape[-1])
+                target, (recons.shape[-1], recons.shape[-1])
             )
-            recons = transforms.center_crop(
-                recons, (target.shape[-1], target.shape[-1])
-            )
+
+            #recons = transforms.center_crop(
+            #    recons, (target.shape[-1], target.shape[-1])
+            #)
             metrics.push(target, recons)
 
     return metrics
@@ -165,5 +192,8 @@ if __name__ == "__main__":
     recons_key = (
         "reconstruction_rss" if args.challenge == "multicoil" else "reconstruction_esc"
     )
-    metrics = evaluate(args, recons_key)
+    metrics = evaluate(args, "kspace")
+    #--target-path /home/slodh/DeepLearning2021_Spring/FinalProject/fastMRI/download_dataset/singlecoil_test --predictions-path /home/slodh/DeepLearning2021_Spring/FinalProject/fastMRI/fastmri_examples/unet/unet/unet_demo/reconstructions --challenge singlecoil
+    #--target-path /home/slodh/DeepLearning2021_Spring/FinalProject/fastMRI/download_dataset/singlecoil_challenge --predictions-path /home/slodh/DeepLearning2021_Spring/FinalProject/fastMRI/fastmri_examples/unet/output/reconstructions --challenge singlecoil
+
     print(metrics)

@@ -81,7 +81,7 @@ def build_args():
 
     # basic args
     path_config = pathlib.Path("../../fastmri_dirs.yaml")
-    num_gpus = 2
+    num_gpus = 1
     backend = "ddp"
     batch_size = 1 if backend == "ddp" else num_gpus
 
@@ -159,7 +159,7 @@ def build_args():
         checkpoint_dir.mkdir(parents=True)
 
     args.checkpoint_callback = pl.callbacks.ModelCheckpoint(
-        filepath=args.default_root_dir / "checkpoints",
+        dirpath=args.default_root_dir / "checkpoints",
         save_top_k=True,
         verbose=True,
         monitor="validation_loss",
