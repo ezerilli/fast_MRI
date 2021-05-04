@@ -344,6 +344,9 @@ class DinoDataTransform:
         """
         Args:
             which_challenge: Challenge from ("singlecoil", "multicoil").
+            local_crops: number of local crops to be used in DINO.
+            global_scale: scale factor for the global views.
+            local_scale: scale factor for the local views.
             mask_func: Optional; A function that can create a mask of
                 appropriate shape.
             use_seed: If true, this class computes a pseudo random number

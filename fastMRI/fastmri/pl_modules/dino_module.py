@@ -2,8 +2,11 @@
 @ezerilli
 
 MRI module for implementing self-distillation with no labels (DINO) in the case of image-to-image reconstruction.
+
+    M. Caron et al. Emerging Properties in Self-Supervised Vision Transformers. arXiv:2104.14294. 2021.
 """
 import copy
+import numpy as np
 from argparse import ArgumentParser
 
 import torch
@@ -17,14 +20,17 @@ class DinoModule(MriModule):
     DINO training module.
 
     This can be used to train baseline U-Nets from the paper:
-    J. Zbontar et al. fastMRI: An Open Dataset and Benchmarks for Accelerated MRI. arXiv:1811.08839. 2018.
+        J. Zbontar et al. fastMRI: An Open Dataset and Benchmarks for Accelerated MRI. arXiv:1811.08839. 2018.
 
     The DINO self-supervised approach is inspired by:
-    M. Caron et al. Emergin Properties in Self-Supervised Vision Transformers. arXiv:2104.14294. 2021.
+        M. Caron et al. Emerging Properties in Self-Supervised Vision Transformers. arXiv:2104.14294. 2021.
     """
 
     def __init__(
         self,
+        epochs,
+        niter_per_epochs,
+        momentum,
         in_chans=1,
         out_chans=1,
         chans=32,
@@ -38,6 +44,9 @@ class DinoModule(MriModule):
     ):
         """
         Args:
+            epochs: number of training epochs.
+            niter_per_epochs: number of iterations per epochs == number of batches.
+            momentum: starting value of the momentum, annealead to 1.0 with a cosine annealing schedule.
             in_chans (int, optional): Number of channels in the input to the
                 U-Net model. Defaults to 1.
             out_chans (int, optional): Number of channels in the output to the
@@ -84,7 +93,13 @@ class DinoModule(MriModule):
         for p in self.teacher.parameters():
             p.requires_grad = False
 
+        # Specific loss for DINO
         self.dino_loss = DinoLoss().cuda()
+
+        # Define the EMA momentum cosine schedule for the teacher momentum upgrade from student params
+        iters = np.arange(epochs * niter_per_epochs)
+        schedule = 1.0 + 0.5 * (momentum - 1.0) * (1.0 + np.cos(np.pi * iters / len(iters)))
+        self.momentum_schedule = schedule[::-1].tolist()
 
     def forward(self, crops):
         return self.student(crops).squeeze(1)
@@ -102,7 +117,7 @@ class DinoModule(MriModule):
 
         # EMA update for the teacher
         with torch.no_grad():
-            m = 0.9  # momentum parameter
+            m = self.momentum_schedule.pop()  # momentum parameter
             for param_student, param_teacher in zip(self.student.parameters(), self.teacher.parameters()):
                 param_teacher.data.mul_(m).add_((1 - m) * param_student.detach().data)
 
@@ -130,7 +145,7 @@ class DinoModule(MriModule):
         }
 
     def test_step(self, batch, batch_idx):
-        crops, image, _, mean, std, fname, slice_num, _ = batch
+        _, image, _, mean, std, fname, slice_num, _ = batch
         output = self.forward(image)
         mean = mean.unsqueeze(1).unsqueeze(2)
         std = std.unsqueeze(1).unsqueeze(2)
@@ -163,13 +178,22 @@ class DinoModule(MriModule):
 
         # network params
         parser.add_argument(
-            "--in_chans", default=1, type=int, help="Number of U-Net input channels"
+            "--in_chans",
+            default=1,
+            type=int,
+            help="Number of U-Net input channels"
         )
         parser.add_argument(
-            "--out_chans", default=1, type=int, help="Number of U-Net output chanenls"
+            "--out_chans",
+            default=1,
+            type=int,
+            help="Number of U-Net output chanenls"
         )
         parser.add_argument(
-            "--chans", default=1, type=int, help="Number of top-level U-Net filters."
+            "--chans",
+            default=1,
+            type=int,
+            help="Number of top-level U-Net filters."
         )
         parser.add_argument(
             "--num_pool_layers",
@@ -178,7 +202,10 @@ class DinoModule(MriModule):
             help="Number of U-Net pooling layers.",
         )
         parser.add_argument(
-            "--drop_prob", default=0.0, type=float, help="U-Net dropout probability"
+            "--drop_prob",
+            default=0.0,
+            type=float,
+            help="U-Net dropout probability"
         )
 
         # training params (opt)
@@ -187,12 +214,15 @@ class DinoModule(MriModule):
         )
         parser.add_argument(
             "--lr_step_size",
-            default=40,
+            default=8,
             type=int,
             help="Epoch at which to decrease step size",
         )
         parser.add_argument(
-            "--lr_gamma", default=0.1, type=float, help="Amount to decrease step size"
+            "--lr_gamma",
+            default=0.1,
+            type=float,
+            help="Amount to decrease step size"
         )
         parser.add_argument(
             "--weight_decay",
@@ -200,5 +230,12 @@ class DinoModule(MriModule):
             type=float,
             help="Strength of weight decay regularization",
         )
+
+        parser.add_argument(
+            '--momentum_teacher',
+            default=0.995,
+            type=float,
+            help="""Base EMA parameter for teacher update. The value is increased to 1 during training with cosine schedule.
+            We recommend setting a higher value with small batches: for example use 0.9995 with batch size of 256.""")
 
         return parser

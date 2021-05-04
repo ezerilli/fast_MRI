@@ -10,6 +10,7 @@ import pathlib
 from argparse import ArgumentParser
 
 import pytorch_lightning as pl
+
 from fastmri.data.mri_data import fetch_dir
 from fastmri.data.subsample import create_mask_for_mask_type
 from fastmri.data.transforms import DinoDataTransform
@@ -27,11 +28,19 @@ def cli_main(args):
         args.mask_type, args.center_fractions, args.accelerations
     )
     # use random masks for train transform, fixed masks for val transform
-    train_transform = DinoDataTransform(args.challenge, local_crops=args.local_crops, global_scale=args.global_scale,
-                                        local_scale=args.local_scale, mask_func=mask, use_seed=False)
-    val_transform = DinoDataTransform(args.challenge, local_crops=args.local_crops, global_scale=args.global_scale,
-                                      local_scale=args.local_scale, mask_func=mask)
-    test_transform = DinoDataTransform(args.challenge, local_crops=args.local_crops, global_scale=args.global_scale,
+    train_transform = DinoDataTransform(args.challenge,
+                                        local_crops=args.local_crops,
+                                        global_scale=args.global_scale,
+                                        local_scale=args.local_scale,
+                                        mask_func=mask, use_seed=False)
+    val_transform = DinoDataTransform(args.challenge,
+                                      local_crops=args.local_crops,
+                                      global_scale=args.global_scale,
+                                      local_scale=args.local_scale,
+                                      mask_func=mask)
+    test_transform = DinoDataTransform(args.challenge,
+                                       local_crops=args.local_crops,
+                                       global_scale=args.global_scale,
                                        local_scale=args.local_scale,)
     # ptl data module - this handles data loaders
     data_module = FastMriDataModule(
@@ -42,7 +51,7 @@ def cli_main(args):
         test_transform=test_transform,
         test_split=args.test_split,
         test_path=args.test_path,
-        sample_rate=0.01,  # args.sample_rate,
+        sample_rate=args.sample_rate,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         distributed_sampler=(args.accelerator in ("ddp", "ddp_cpu")),
@@ -52,6 +61,9 @@ def cli_main(args):
     # model
     # ------------
     model = DinoModule(
+        epochs=args.max_epochs,
+        niter_per_epochs=len(data_module.train_dataloader()),
+        momentum=args.momentum_teacher,
         in_chans=args.in_chans,
         out_chans=args.out_chans,
         chans=args.chans,
@@ -86,7 +98,7 @@ def build_args():
     path_config = pathlib.Path("../../fastmri_dirs.yaml")
     num_gpus = 1
     backend = None
-    batch_size = 1 if backend == "ddp" else num_gpus
+    batch_size = 1
 
     # set defaults based on optional directory config
     data_path = fetch_dir("knee_path", path_config)
@@ -128,7 +140,7 @@ def build_args():
     parser.add_argument(
         '--global_scale',
         type=float, nargs='+',
-        default=(0.4, 1.),
+        default=(0.5, 1.),  # TODO: Global scale too small?
         help="""Scale range of the cropped image before resizing, relatively to the origin image.
         Used for large global view cropping. When disabling multi-crop (--local_crops_number 0), we
         recommand using a wider range of scale ("--global_crops_scale 0.14 1." for example)""")
@@ -136,7 +148,7 @@ def build_args():
     parser.add_argument(
         '--local_crops',
         type=int,
-        default=2,
+        default=2,  # TODO: Local views?
         help="""Number of small local views to generate. Set this parameter to 0 to disable multi-crop training.
         When disabling multi-crop we recommend to use "--global_crops_scale 0.14 1." """)
 
@@ -144,7 +156,7 @@ def build_args():
         '--local_scale',
         type=float,
         nargs='+',
-        default=(0.05, 0.4),
+        default=(0.05, 0.5),  # TODO: Local scale too small?
         help="""Scale range of the cropped image before resizing, relatively to the origin image.
         Used for small local view cropping of multi-crop.""")
 
@@ -156,7 +168,7 @@ def build_args():
     parser = DinoModule.add_model_specific_args(parser)
     parser.set_defaults(
         in_chans=1,  # number of input channels to U-Net
-        out_chans=1,  # number of output chanenls to U-Net
+        out_chans=1,  # number of output channels to U-Net
         chans=32,  # number of top-level U-Net channels
         num_pool_layers=4,  # number of U-Net pooling layers
         drop_prob=0.0,  # dropout probability
@@ -175,7 +187,7 @@ def build_args():
         seed=42,  # random seed
         deterministic=True,  # makes things slower, but deterministic
         default_root_dir=default_root_dir,  # directory for logs and checkpoints
-        max_epochs=50,  # max number of epochs
+        max_epochs=10,  # max number of epochs
     )
 
     args = parser.parse_args()

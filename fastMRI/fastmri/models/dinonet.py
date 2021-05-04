@@ -8,11 +8,12 @@ import torch
 from .unet import Unet
 from torch import nn
 from torch.nn import functional as F
+from typing import List, Union
 
 
 class DinoNet(nn.Module):
     """
-    PyTorch implementation of a Dino U-Net model.
+    PyTorch implementation of a U-Net model to train in self-distillation with no labels (DINO).
     """
 
     def __init__(
@@ -40,7 +41,7 @@ class DinoNet(nn.Module):
             drop_prob=drop_prob,
         )
 
-    def forward(self, crops: torch.Tensor) -> torch.Tensor:
+    def forward(self, crops: Union[torch.Tensor, List[torch.Tensor]]) -> torch.Tensor:
         """
         Args:
             crops:  list of Input 4D tensor of shape `(N, in_chans, H, W)`.
@@ -51,18 +52,19 @@ class DinoNet(nn.Module):
         if not isinstance(crops, list):
             crops = [crops]
 
-        # TODO: is that really necessary? We can have multi-crops in image reconstruction
-        crops_sizes = torch.tensor([crop.shape[-1] for crop in crops])
-        sizes_count = torch.unique_consecutive(crops_sizes, return_counts=True)[1]
-        cat_splits = torch.cumsum(sizes_count, dim=0)
+        # TODO: is that really necessary? We cannot have multi-crops (and so mulit-size) in image reconstruction!
+        # TODO: Faster to just scale to same dimensions and do a simple model output on the concatenated tensors
+        # crops_sizes = torch.tensor([crop.shape[-1] for crop in crops])
+        # sizes_count = torch.unique_consecutive(crops_sizes, return_counts=True)[1]
+        # cat_splits = torch.cumsum(sizes_count, dim=0)
+        #
+        # split_start = 0
+        # for split_end in cat_splits:
+        #     model_output = self.model(torch.cat(crops[split_start: split_end], dim=0))
+        #     output = model_output if split_start == 0 else torch.cat([output, model_output], dim=0)
+        #     split_start = split_end
 
-        split_start = 0
-        for split_end in cat_splits:
-            model_output = self.model(torch.cat(crops[split_start: split_end], dim=0))
-            output = model_output if split_start == 0 else torch.cat([output, model_output], dim=0)
-            split_start = split_end
-
-        return output
+        return self.model(torch.cat(crops, dim=0))
 
 
 class DinoLoss(nn.Module):
@@ -72,7 +74,7 @@ class DinoLoss(nn.Module):
         """
         F1-loss between outputs of the teacher and student networks.
         """
-        # Teacher detaching
+        # Teacher detaching for avoid training it
         for i, output in enumerate(teacher_output):
             teacher_output[i] = output.detach()
 
