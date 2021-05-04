@@ -3,12 +3,11 @@
 
 MRI module for implementing self-distillation with no labels (DINO) in the case of image-to-image reconstruction.
 """
-
+import copy
 from argparse import ArgumentParser
 
 import torch
-from fastmri.models import Unet
-from torch.nn import functional as F
+from fastmri.models import DinoNet, DinoLoss
 
 from .mri_module import MriModule
 
@@ -69,29 +68,54 @@ class DinoModule(MriModule):
         self.lr_gamma = lr_gamma
         self.weight_decay = weight_decay
 
-        self.unet = Unet(
+        self.student = DinoNet(
             in_chans=self.in_chans,
             out_chans=self.out_chans,
             chans=self.chans,
             num_pool_layers=self.num_pool_layers,
-            drop_prob=self.drop_prob,
+            drop_prob=self.drop_prob
         )
 
-    def forward(self, image):
-        return self.unet(image.unsqueeze(1)).squeeze(1)
+        # teacher and student start with the same weights
+        self.teacher = copy.deepcopy(self.student)
+        # self.teacher_model.load_state_dict(self.student_model.module.state_dict())
+
+        # there is no backpropagation through the teacher, so no need for gradients
+        for p in self.teacher.parameters():
+            p.requires_grad = False
+
+        self.dino_loss = DinoLoss().cuda()
+
+    def forward(self, crops):
+        return self.student(crops).squeeze(1)
+
+    def teacher_forward(self, crops):
+        return self.teacher(crops).squeeze(1)
 
     def training_step(self, batch, batch_idx):
-        image, target, _, _, _, _, _ = batch
-        output = self(image)
-        loss = F.l1_loss(output, target)
+        crops, image, target, _, _, _, _, _ = batch
 
+        teacher_output = self.teacher(crops[:2])  # only the 2 global views pass through the teacher
+        student_output = self.student(crops)
+        loss = self.dino_loss(student_output, teacher_output)
         self.log("loss", loss.detach())
+
+        # EMA update for the teacher
+        with torch.no_grad():
+            m = 0.9  # momentum parameter
+            for param_student, param_teacher in zip(self.student.parameters(), self.teacher.parameters()):
+                param_teacher.data.mul_(m).add_((1 - m) * param_student.detach().data)
 
         return loss
 
     def validation_step(self, batch, batch_idx):
-        image, target, mean, std, fname, slice_num, max_value = batch
+        crops, image, target, mean, std, fname, slice_num, max_value = batch
+
+        teacher_output = self.teacher(crops[:2])  # only the 2 global views pass through the teacher
+        student_output = self.student(crops)
+        loss = self.dino_loss(student_output, teacher_output)
         output = self(image)
+
         mean = mean.unsqueeze(1).unsqueeze(2)
         std = std.unsqueeze(1).unsqueeze(2)
 
@@ -102,11 +126,11 @@ class DinoModule(MriModule):
             "max_value": max_value,
             "output": output * std + mean,
             "target": target * std + mean,
-            "val_loss": F.l1_loss(output, target),
+            "val_loss": loss,
         }
 
     def test_step(self, batch, batch_idx):
-        image, _, mean, std, fname, slice_num, _ = batch
+        crops, image, _, mean, std, fname, slice_num, _ = batch
         output = self.forward(image)
         mean = mean.unsqueeze(1).unsqueeze(2)
         std = std.unsqueeze(1).unsqueeze(2)
