@@ -335,18 +335,14 @@ class DinoDataTransform:
     def __init__(
         self,
         which_challenge: str,
-        local_crops: int,
-        global_scale: Tuple[float, float],
-        local_scale: Tuple[float, float],
+        n_transforms: int = 1,
         mask_func: Optional[MaskFunc] = None,
         use_seed: bool = True
     ):
         """
         Args:
             which_challenge: Challenge from ("singlecoil", "multicoil").
-            local_crops: number of local crops to be used in DINO.
-            global_scale: scale factor for the global views.
-            local_scale: scale factor for the local views.
+            n_transforms: number of local transforms to be used in DINO.
             mask_func: Optional; A function that can create a mask of
                 appropriate shape.
             use_seed: If true, this class computes a pseudo random number
@@ -359,29 +355,31 @@ class DinoDataTransform:
         self.mask_func = mask_func
         self.which_challenge = which_challenge
         self.use_seed = use_seed
+        self.n_transforms = max(n_transforms, 1)
 
-        # first global crop
-        self.global_mutli_crop_1 = Compose([
-            RandomResizedCrop(320, scale=global_scale, interpolation=InterpolationMode.BICUBIC),
-            RandomHorizontalFlip(p=0.5),
-            RandomVerticalFlip(p=0.5),
-            # RandomApply([GaussianBlur(kernel_size=3)], p=0.5)
-        ])
-        # second global crop
-        self.global_multi_crop_2 = Compose([
-            RandomResizedCrop(320, scale=global_scale, interpolation=InterpolationMode.BICUBIC),
-            RandomHorizontalFlip(p=0.5),
-            RandomVerticalFlip(p=0.5),
-            # RandomApply([GaussianBlur(kernel_size=3)], p=0.5)
-        ])
+        # TODO: Multi-crop is unfeasible for image reconstruction tasks
+        # # first global crop
+        # self.global_mutli_crop_1 = Compose([
+        #     RandomResizedCrop(320, scale=global_scale, interpolation=InterpolationMode.BICUBIC),
+        #     RandomHorizontalFlip(p=0.5),
+        #     RandomVerticalFlip(p=0.5),
+        #     # RandomApply([GaussianBlur(kernel_size=3)], p=0.5)
+        # ])
+        # # second global crop
+        # self.global_multi_crop_2 = Compose([
+        #     RandomResizedCrop(320, scale=global_scale, interpolation=InterpolationMode.BICUBIC),
+        #     RandomHorizontalFlip(p=0.5),
+        #     RandomVerticalFlip(p=0.5),
+        #     # RandomApply([GaussianBlur(kernel_size=3)], p=0.5)
+        # ])
         # transformation for the local small crops
-        self.local_crops = local_crops
-        self.local_multi_crop = Compose([
-            RandomResizedCrop(320, scale=local_scale, interpolation=InterpolationMode.BICUBIC),
-            RandomHorizontalFlip(p=0.5),
-            RandomVerticalFlip(p=0.5),
-            # RandomApply([GaussianBlur(kernel_size=3)], p=0.5)
-        ])
+        # self.local_crops = local_crops
+        # self.local_multi_crop = Compose([
+        #     RandomResizedCrop(320, scale=local_scale, interpolation=InterpolationMode.BICUBIC),
+        #     RandomHorizontalFlip(p=0.5),
+        #     RandomVerticalFlip(p=0.5),
+        #     # RandomApply([GaussianBlur(kernel_size=3)], p=0.5)
+        # ])
 
     def __call__(
         self,
@@ -391,7 +389,7 @@ class DinoDataTransform:
         attrs: Dict,
         fname: str,
         slice_num: int,
-    ) -> Tuple[List[torch.Tensor], torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, str, int, float]:
+    ) -> Tuple[List[torch.Tensor], torch.Tensor, torch.Tensor, torch.Tensor, str, int, float]:
         """
         Args:
             kspace: Input k-space of shape (num_coils, rows, cols) for
@@ -404,27 +402,18 @@ class DinoDataTransform:
 
         Returns:
             tuple containing:
-                image: Zero-filled input image.
-                target: Target image converted to a torch.Tensor.
+                images: Zero-filled input images (as many as n_transforms).
+                target: Target image converted to aa torch.Tensor.
                 mean: Mean value used for normalization.
                 std: Standard deviation value used for normalization.
                 fname: File name.
                 slice_num: Serial number of the slice.
         """
         kspace = to_tensor(kspace)
+        images = []
 
         # check for max value
         max_value = attrs["max"] if "max" in attrs.keys() else 0.0
-
-        # apply mask
-        if self.mask_func:
-            seed = None if not self.use_seed else tuple(map(ord, fname))
-            masked_kspace, mask = apply_mask(kspace, self.mask_func, seed)
-        else:
-            masked_kspace = kspace
-
-        # inverse Fourier transform to get zero filled solution
-        image = fastmri.ifft2c(masked_kspace)
 
         # crop input to correct size
         if target is not None:
@@ -432,22 +421,25 @@ class DinoDataTransform:
         else:
             crop_size = (attrs["recon_size"][0], attrs["recon_size"][1])
 
-        # check for FLAIR 203
-        if image.shape[-2] < crop_size[1]:
-            crop_size = (image.shape[-2], image.shape[-2])
+        for _ in range(self.n_transforms):
+            # apply mask
+            if self.mask_func:
+                seed = None if not self.use_seed else tuple(map(ord, fname))
+                masked_kspace, mask = apply_mask(kspace, self.mask_func, seed)
+            else:
+                masked_kspace = kspace
 
-        image = complex_center_crop(image, crop_size)
+            # inverse Fourier transform to get zero filled solution
+            image = fastmri.ifft2c(masked_kspace)
+            image = complex_center_crop(image, crop_size)
 
-        # absolute value
-        image = fastmri.complex_abs(image)
+            # absolute value
+            image = fastmri.complex_abs(image)
 
-        # apply Root-Sum-of-Squares if multicoil data
-        if self.which_challenge == "multicoil":
-            image = fastmri.rss(image)
-
-        # normalize input
-        image, mean, std = normalize_instance(image, eps=1e-11)
-        image = image.clamp(-6, 6)
+            # normalize input
+            image, mean, std = normalize_instance(image, eps=1e-11)
+            image = image.clamp(-6, 6)
+            images.append(image.unsqueeze(0))
 
         # normalize target
         if target is not None:
@@ -458,13 +450,14 @@ class DinoDataTransform:
         else:
             target = torch.Tensor([0])
 
-        # Multi-crop
-        image = image.unsqueeze(0)
-        crops = [self.global_mutli_crop_1(image), self.global_multi_crop_2(image)]
-        local_crops = [self.local_multi_crop(image) for _ in range(self.local_crops)]
-        crops += local_crops
+        # TODO: Multi-crop is unfeasible for image reconstruction tasks
+        # # Multi-crop
+        # image = image.unsqueeze(0)
+        # crops = [self.global_mutli_crop_1(image), self.global_multi_crop_2(image)]
+        # local_crops = [self.local_multi_crop(image) for _ in range(self.local_crops)]
+        # crops += local_crops
 
-        return crops, image, target, mean, std, fname, slice_num, max_value
+        return images, target, mean, std, fname, slice_num, max_value
 
 
 class VarNetDataTransform:

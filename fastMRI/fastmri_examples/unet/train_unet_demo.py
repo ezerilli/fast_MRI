@@ -39,7 +39,7 @@ def cli_main(args):
         test_transform=test_transform,
         test_split=args.test_split,
         test_path=args.test_path,
-        sample_rate=args.sample_rate,
+        sample_rate=0.01,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         distributed_sampler=(args.accelerator in ("ddp", "ddp_cpu")),
@@ -81,8 +81,8 @@ def build_args():
 
     # basic args
     path_config = pathlib.Path("../../fastmri_dirs.yaml")
-    num_gpus = 2
-    backend = "ddp"
+    num_gpus = 1
+    backend = None
     batch_size = 1 if backend == "ddp" else num_gpus
 
     # set defaults based on optional directory config
@@ -159,7 +159,7 @@ def build_args():
         checkpoint_dir.mkdir(parents=True)
 
     args.checkpoint_callback = pl.callbacks.ModelCheckpoint(
-        filepath=args.default_root_dir / "checkpoints",
+        dirpath=args.default_root_dir / "checkpoints",
         save_top_k=True,
         verbose=True,
         monitor="validation_loss",

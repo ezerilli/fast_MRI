@@ -29,19 +29,13 @@ def cli_main(args):
     )
     # use random masks for train transform, fixed masks for val transform
     train_transform = DinoDataTransform(args.challenge,
-                                        local_crops=args.local_crops,
-                                        global_scale=args.global_scale,
-                                        local_scale=args.local_scale,
+                                        n_transforms=args.n_transforms,
                                         mask_func=mask, use_seed=False)
     val_transform = DinoDataTransform(args.challenge,
-                                      local_crops=args.local_crops,
-                                      global_scale=args.global_scale,
-                                      local_scale=args.local_scale,
-                                      mask_func=mask)
+                                      n_transforms=args.n_transforms,
+                                      mask_func=mask, use_seed=False)
     test_transform = DinoDataTransform(args.challenge,
-                                       local_crops=args.local_crops,
-                                       global_scale=args.global_scale,
-                                       local_scale=args.local_scale,)
+                                       n_transforms=1,)
     # ptl data module - this handles data loaders
     data_module = FastMriDataModule(
         data_path=args.data_path,
@@ -51,7 +45,7 @@ def cli_main(args):
         test_transform=test_transform,
         test_split=args.test_split,
         test_path=args.test_path,
-        sample_rate=args.sample_rate,
+        sample_rate=0.01,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         distributed_sampler=(args.accelerator in ("ddp", "ddp_cpu")),
@@ -136,29 +130,11 @@ def build_args():
         help="Acceleration rates to use for masks",
     )
 
-    # Multi-crop parameters
     parser.add_argument(
-        '--global_scale',
-        type=float, nargs='+',
-        default=(0.5, 1.),  # TODO: Global scale too small?
-        help="""Scale range of the cropped image before resizing, relatively to the origin image.
-        Used for large global view cropping. When disabling multi-crop (--local_crops_number 0), we
-        recommand using a wider range of scale ("--global_crops_scale 0.14 1." for example)""")
-
-    parser.add_argument(
-        '--local_crops',
+        '--n_transforms',
         type=int,
-        default=2,  # TODO: Local views?
-        help="""Number of small local views to generate. Set this parameter to 0 to disable multi-crop training.
-        When disabling multi-crop we recommend to use "--global_crops_scale 0.14 1." """)
-
-    parser.add_argument(
-        '--local_scale',
-        type=float,
-        nargs='+',
-        default=(0.05, 0.5),  # TODO: Local scale too small?
-        help="""Scale range of the cropped image before resizing, relatively to the origin image.
-        Used for small local view cropping of multi-crop.""")
+        default=2,
+        help="""Number of trasnforms to generate.""")
 
     # data config with path to fastMRI data and batch size
     parser = FastMriDataModule.add_data_specific_args(parser)

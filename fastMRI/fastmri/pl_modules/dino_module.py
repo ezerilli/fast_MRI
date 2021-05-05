@@ -101,17 +101,17 @@ class DinoModule(MriModule):
         schedule = 1.0 + 0.5 * (momentum - 1.0) * (1.0 + np.cos(np.pi * iters / len(iters)))
         self.momentum_schedule = schedule[::-1].tolist()
 
-    def forward(self, crops):
-        return self.student(crops).squeeze(1)
+    def forward(self, images):
+        return self.student(images).squeeze(1)
 
-    def teacher_forward(self, crops):
-        return self.teacher(crops).squeeze(1)
+    def teacher_forward(self, images):
+        return self.teacher(images).squeeze(1)
 
     def training_step(self, batch, batch_idx):
-        crops, image, target, _, _, _, _, _ = batch
+        images, target, _, _, _, _, _ = batch
 
-        teacher_output = self.teacher(crops[:2])  # only the 2 global views pass through the teacher
-        student_output = self.student(crops)
+        teacher_output = self.teacher(images[:2])  # only the 2 global views pass through the teacher
+        student_output = self.student(images)
         loss = self.dino_loss(student_output, teacher_output)
         self.log("loss", loss.detach())
 
@@ -124,12 +124,12 @@ class DinoModule(MriModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        crops, image, target, mean, std, fname, slice_num, max_value = batch
+        images, target, mean, std, fname, slice_num, max_value = batch
 
-        teacher_output = self.teacher(crops[:2])  # only the 2 global views pass through the teacher
-        student_output = self.student(crops)
+        teacher_output = self.teacher(images[:2])  # only the 2 global views pass through the teacher
+        student_output = self.student(images)
         loss = self.dino_loss(student_output, teacher_output)
-        output = self(image)
+        output = self(images[0])
 
         mean = mean.unsqueeze(1).unsqueeze(2)
         std = std.unsqueeze(1).unsqueeze(2)
@@ -145,8 +145,8 @@ class DinoModule(MriModule):
         }
 
     def test_step(self, batch, batch_idx):
-        _, image, _, mean, std, fname, slice_num, _ = batch
-        output = self.forward(image)
+        images, _, mean, std, fname, slice_num, _ = batch
+        output = self.forward(images[0])
         mean = mean.unsqueeze(1).unsqueeze(2)
         std = std.unsqueeze(1).unsqueeze(2)
 
