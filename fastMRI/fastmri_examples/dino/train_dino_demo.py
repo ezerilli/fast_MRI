@@ -45,7 +45,7 @@ def cli_main(args):
         test_transform=test_transform,
         test_split=args.test_split,
         test_path=args.test_path,
-        sample_rate=0.01,
+        sample_rate=0.1,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         distributed_sampler=(args.accelerator in ("ddp", "ddp_cpu")),
@@ -134,7 +134,7 @@ def build_args():
         '--n_transforms',
         type=int,
         default=2,
-        help="""Number of trasnforms to generate.""")
+        help="""Number of transforms to generate.""")
 
     # data config with path to fastMRI data and batch size
     parser = FastMriDataModule.add_data_specific_args(parser)
